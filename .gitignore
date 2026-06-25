@@ -1,0 +1,23 @@
+
+# Ignore the virtual environment
+venv/
+.venv/
+
+# Environment variables
+.env
+.env.*
+
+# Ignore the street images
+street_images/
+perspective_crops/
+
+# Personal notes
+Self-Note
+
+# Python
+*.egg-info/
+dist/
+build/
+
+# OS
+.DS_Store
