@@ -40,10 +40,8 @@ ZOOM_LEVEL     = 3      # Zoom 3 → 8x4 tiles → 4096x2048 equirectangular
 
 # Only the FIRST and LAST coordinate matter — the script interpolates every
 # 4 meters between them automatically.
-PATH_COORDINATES = [
-    (33.764771, -84.382069),  # pano_005 — south end of brick building
-    (33.765126, -84.382061),  # pano_009 — north end of brick building
-]
+from coords import COORDINATES
+
 
 
 # =============================================================================
@@ -192,10 +190,37 @@ def main():
     Path(OUTPUT_FOLDER).mkdir(exist_ok=True)
 
     session      = get_session_token(API_KEY)
-    start_coord  = PATH_COORDINATES[0]
-    end_coord    = PATH_COORDINATES[-1]
-    pano_list    = get_dense_pano_ids(API_KEY, start_coord, end_coord, step_meters=4.0)
+    all_metadata = []
+index = 0
 
+for lat, lng, hood, high_density in COORDINATES:
+    print(f"\n[{index+1}/{len(COORDINATES)}] {hood} ({lat}, {lng})")
+    
+    pano_list = get_dense_pano_ids(API_KEY, (lat, lng), (lat, lng), step_meters=4.0)
+    
+    for pano_id in pano_list:
+        meta = get_pano_metadata(API_KEY, session, pano_id)
+        if meta is None:
+            continue
+        real_lat, real_lng, car_heading = meta
+        fname = download_and_stitch_panorama(API_KEY, session, pano_id, OUTPUT_FOLDER, index)
+        if fname is None:
+            continue
+        all_metadata.append({
+            "image_name": fname,
+            "pano_index": index,
+            "pano_id": pano_id,
+            "lat": real_lat,
+            "lng": real_lng,
+            "car_heading": car_heading,
+            "neighborhood": hood,
+            "high_density": high_density,
+        })
+        index += 1
+
+    with open(METADATA_FILE, "w") as f:
+        json.dump(all_metadata, f, indent=2)
+        
     all_metadata = []
     print(f"\nDownloading and stitching {len(pano_list)} panoramas...\n")
 
