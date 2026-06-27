@@ -23,30 +23,10 @@ def _interpolate(lat1, lon1, lat2, lon2, step_m=20):
 
 _PATHS = [
     # (lat1, lon1, lat2, lon2, neighborhood, high_balcony_density)
-    (33.7800, -84.3880, 33.7720, -84.3810, "Midtown", True),
-    (33.7760, -84.3900, 33.7760, -84.3800, "Midtown", True),
-    (33.8400, -84.3900, 33.8310, -84.3800, "Buckhead", True),
-    (33.8350, -84.3950, 33.8350, -84.3830, "Buckhead", True),
+    
     (33.7600, -84.3700, 33.7540, -84.3620, "Old Fourth Ward", True),
     (33.7570, -84.3730, 33.7570, -84.3630, "Old Fourth Ward", True),
-    (33.7540, -84.3580, 33.7470, -84.3510, "Inman Park", False),
-    (33.7510, -84.3600, 33.7510, -84.3520, "Inman Park", False),
-    (33.7560, -84.3930, 33.7490, -84.3860, "Downtown", True),
-    (33.7530, -84.3960, 33.7530, -84.3850, "Downtown", True),
-    (33.7810, -84.3620, 33.7740, -84.3540, "Virginia-Highland", False),
-    (33.7780, -84.3650, 33.7780, -84.3550, "Virginia-Highland", False),
-    (33.8350, -84.3380, 33.8280, -84.3280, "Buford Hwy", True),
-    (33.8310, -84.3420, 33.8310, -84.3310, "Buford Hwy", True),
-    (33.7380, -84.3720, 33.7310, -84.3640, "Grant Park", False),
-    (33.7350, -84.3760, 33.7350, -84.3660, "Grant Park", False),
-    (33.7730, -84.4150, 33.7660, -84.4060, "Westside", True),
-    (33.7700, -84.4180, 33.7700, -84.4080, "Westside", True),
-    (33.7530, -84.3530, 33.7460, -84.3450, "Edgewood", False),
-    (33.7500, -84.3560, 33.7500, -84.3460, "Edgewood", False),
-    (33.7710, -84.3620, 33.7640, -84.3540, "Poncey-Highland", True),
-    (33.7680, -84.3650, 33.7680, -84.3560, "Poncey-Highland", True),
-    (33.7440, -84.4010, 33.7380, -84.3940, "Castleberry Hill", True),
-    (33.7410, -84.4040, 33.7410, -84.3950, "Castleberry Hill", True),
+
 ]
 
 # Build full coordinate list

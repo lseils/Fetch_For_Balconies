@@ -83,8 +83,7 @@ def get_dense_pano_ids(api_key: str, start_coord, end_coord,
 
         resp = requests.get(
             "https://maps.googleapis.com/maps/api/streetview/metadata",
-            params={"location": f"{current_lat},{current_lon}",
-                    "key": api_key, "radius": 15}
+            params={"location": f"{lat},{lng}", "key": API_KEY, "radius": 50}
         )
         data = resp.json()
 
@@ -189,23 +188,43 @@ def download_and_stitch_panorama(api_key: str, session: str, pano_id: str,
 def main():
     Path(OUTPUT_FOLDER).mkdir(exist_ok=True)
 
-    session      = get_session_token(API_KEY)
+    session = get_session_token(API_KEY)
     all_metadata = []
-index = 0
+    index = 0
+    seen_panos = set()  # track duplicates
 
-for lat, lng, hood, high_density in COORDINATES:
-    print(f"\n[{index+1}/{len(COORDINATES)}] {hood} ({lat}, {lng})")
-    
-    pano_list = get_dense_pano_ids(API_KEY, (lat, lng), (lat, lng), step_meters=4.0)
-    
-    for pano_id in pano_list:
+    for lat, lng, hood, high_density in COORDINATES:
+        print(f"\n[{index+1}/{len(COORDINATES)}] {hood} ({lat}, {lng})")
+
+        resp = requests.get(
+            "https://maps.googleapis.com/maps/api/streetview/metadata",
+            params={"location": f"{lat},{lng}", "key": API_KEY, "radius": 50}
+        )
+        data = resp.json()
+        print(f"  [DEBUG] API response: {data}")
+
+        if data.get("status") != "OK":
+            print(f"  [-] No pano found")
+            continue
+
+        pano_id = data["pano_id"]
+
+        if pano_id in seen_panos:
+            print(f"  [~] Duplicate pano, skipping")
+            continue
+        seen_panos.add(pano_id)
+
+        print(f"  [+] Pano: {pano_id[:12]}...")
+
         meta = get_pano_metadata(API_KEY, session, pano_id)
         if meta is None:
             continue
         real_lat, real_lng, car_heading = meta
+
         fname = download_and_stitch_panorama(API_KEY, session, pano_id, OUTPUT_FOLDER, index)
         if fname is None:
             continue
+
         all_metadata.append({
             "image_name": fname,
             "pano_index": index,
@@ -218,46 +237,11 @@ for lat, lng, hood, high_density in COORDINATES:
         })
         index += 1
 
-    with open(METADATA_FILE, "w") as f:
-        json.dump(all_metadata, f, indent=2)
-        
-    all_metadata = []
-    print(f"\nDownloading and stitching {len(pano_list)} panoramas...\n")
+        with open(METADATA_FILE, "w") as f:
+            json.dump(all_metadata, f, indent=2)
 
-    for index, pano_id in enumerate(pano_list):
-        print(f"[{index+1}/{len(pano_list)}] Pano {pano_id[:12]}...")
 
-        meta = get_pano_metadata(API_KEY, session, pano_id)
-        if meta is None:
-            print(f"  [SKIP] No metadata for {pano_id[:12]}")
-            continue
 
-        real_lat, real_lng, car_heading = meta
-        print(f"  GPS: ({real_lat:.6f}, {real_lng:.6f})  Car heading: {car_heading:.1f}°")
-
-        fname = download_and_stitch_panorama(
-            API_KEY, session, pano_id, OUTPUT_FOLDER, index
-        )
-        if fname is None:
-            continue
-
-        all_metadata.append({
-            "image_name":  fname,
-            "pano_index":  index,
-            "pano_id":     pano_id,
-            "lat":         real_lat,
-            "lng":         real_lng,
-            "car_heading": car_heading,
-        })
-
-    with open(METADATA_FILE, "w") as f:
-        json.dump(all_metadata, f, indent=2)
-
-    print(f"\n{'='*52}")
-    print(f"  Done! {len(all_metadata)} panoramas saved to '{OUTPUT_FOLDER}/'")
-    print(f"  Metadata → {METADATA_FILE}")
-    print(f"  Next step: python crop_perspective.py")
-    print(f"{'='*52}")
 
 
 if __name__ == "__main__":

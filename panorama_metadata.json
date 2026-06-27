@@ -1,0 +1,22 @@
+[
+  {
+    "image_name": "pano_000.jpg",
+    "pano_index": 0,
+    "pano_id": "vEPLEu5ZF_fnWO1m02gM8g",
+    "lat": 33.75458687499528,
+    "lng": -84.36287927467099,
+    "car_heading": 171.14235,
+    "neighborhood": "Old Fourth Ward",
+    "high_density": true
+  },
+  {
+    "image_name": "pano_001.jpg",
+    "pano_index": 1,
+    "pano_id": "qx-lRO8a_rvZujwHcGr9Ag",
+    "lat": 33.7538466858862,
+    "lng": -84.36198836534287,
+    "car_heading": 77.473366,
+    "neighborhood": "Old Fourth Ward",
+    "high_density": true
+  }
+]
