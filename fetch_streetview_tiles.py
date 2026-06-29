@@ -139,7 +139,7 @@ def download_and_stitch_panorama(api_key: str, session: str, pano_id: str,
         f"/{zoom}/0/0"
         f"?session={session}&key={api_key}&panoId={pano_id}"
     )
-    probe = requests.get(probe_url)
+    probe = requests.get(probe_url, timeout=10)
     if probe.status_code != 200:
         print(f"    [ERROR] Could not fetch probe tile (HTTP {probe.status_code})")
         return None
@@ -157,18 +157,25 @@ def download_and_stitch_panorama(api_key: str, session: str, pano_id: str,
     for y in range(num_y):
         for x in range(num_x):
             if x == 0 and y == 0:
-                continue  # already pasted above
+                continue
             tile_url = (
                 f"https://tile.googleapis.com/v1/streetview/tiles"
                 f"/{zoom}/{x}/{y}"
                 f"?session={session}&key={api_key}&panoId={pano_id}"
             )
-            r = requests.get(tile_url)
-            if r.status_code == 200:
-                tile_img = Image.open(io.BytesIO(r.content))
-                pano_img.paste(tile_img, (x * tile_w, y * tile_h))
-            else:
-                print(f"    [WARN] Tile ({x},{y}) failed with HTTP {r.status_code}")
+            try:
+                r = requests.get(tile_url, timeout=10)  # add timeout
+                if r.status_code == 200:
+                    tile_img = Image.open(io.BytesIO(r.content))
+                    pano_img.paste(tile_img, (x * tile_w, y * tile_h))
+                else:
+                    print(f"    [WARN] Tile ({x},{y}) failed with HTTP {r.status_code}")
+                    failed += 1
+            except requests.exceptions.Timeout:
+                print(f"    [WARN] Tile ({x},{y}) timed out, skipping")
+                failed += 1
+            except Exception as e:
+                print(f"    [WARN] Tile ({x},{y}) error: {e}")
                 failed += 1
 
     if failed > (num_x * num_y) // 4:

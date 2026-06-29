@@ -23,7 +23,10 @@ def _interpolate(lat1, lon1, lat2, lon2, step_m=20):
 
 _PATHS = [
     # (lat1, lon1, lat2, lon2, neighborhood, high_balcony_density)
-    
+    (33.7800, -84.3880, 33.7720, -84.3810, "Midtown", True),
+    (33.7760, -84.3900, 33.7760, -84.3800, "Midtown", True),
+    (33.8400, -84.3900, 33.8310, -84.3800, "Buckhead", True),
+    (33.8350, -84.3950, 33.8350, -84.3830, "Buckhead", True),
     (33.7600, -84.3700, 33.7540, -84.3620, "Old Fourth Ward", True),
     (33.7570, -84.3730, 33.7570, -84.3630, "Old Fourth Ward", True),
 
