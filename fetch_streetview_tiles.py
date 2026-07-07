@@ -196,9 +196,19 @@ def main():
     Path(OUTPUT_FOLDER).mkdir(exist_ok=True)
 
     session = get_session_token(API_KEY)
-    all_metadata = []
-    index = 0
-    seen_panos = set()  # track duplicates
+
+    if Path(METADATA_FILE).exists():
+        with open(METADATA_FILE, "r") as f:
+            all_metadata = json.load(f)
+    else:
+        all_metadata = []
+
+    seen_panos = set(entry["pano_id"] for entry in all_metadata)
+    existing = list(Path(OUTPUT_FOLDER).glob("pano_*.jpg"))
+    index = len(existing)
+
+    print(f"Resuming from index {index} with {len(seen_panos)} already seen panos")
+
 
     for lat, lng, hood, high_density in COORDINATES:
         print(f"\n[{index+1}/{len(COORDINATES)}] {hood} ({lat}, {lng})")
