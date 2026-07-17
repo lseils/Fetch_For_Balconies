@@ -37,7 +37,15 @@ _PATHS = [
     #(33.7780, -84.3650, 33.7780, -84.3550, "Virginia-Highland", False),
     #(33.8350, -84.3380, 33.8280, -84.3280, "Buford Hwy", True),
     #(33.8310, -84.3420, 33.8310, -84.3310, "Buford Hwy", True),
-    #(33.7380, -84.3720, 33.7310, -84.3640, "Grant Park", False),
+    #(33.7380, -84.3720, 33.7310, -84.3640, "Grant Park", False), #dont do this one again
+    #(33.7730, -84.4150, 33.7660, -84.4060, "Westside", True),
+    #(33.7700, -84.4180, 33.7700, -84.4080, "Westside", True),
+    #(33.7530, -84.3530, 33.7460, -84.3450, "Edgewood", False),
+    #(33.7500, -84.3560, 33.7500, -84.3460, "Edgewood", False),
+    (33.7710, -84.3620, 33.7640, -84.3540, "Poncey-Highland", True),
+    #(33.7680, -84.3650, 33.7680, -84.3560, "Poncey-Highland", True),
+    #(33.7440, -84.4010, 33.7380, -84.3940, "Castleberry Hill", True),
+    #(33.7410, -84.4040, 33.7410, -84.3950, "Castleberry Hill", True),
 ]
 
 # Build full coordinate list
