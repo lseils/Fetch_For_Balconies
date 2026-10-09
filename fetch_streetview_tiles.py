@@ -40,8 +40,11 @@ ZOOM_LEVEL     = 3      # Zoom 3 → 8x4 tiles → 4096x2048 equirectangular
 
 # Only the FIRST and LAST coordinate matter — the script interpolates every
 # 4 meters between them automatically.
-from coords import COORDINATES
+from coords import COORDINATES, SEED_POINTS, HOPS_PER_DIRECTION
 
+# When walking down the road, only follow a link if it turns less than this
+# many degrees from the current direction (keeps us on the same street).
+MAX_TURN_DEG = 45
 
 
 # =============================================================================
@@ -102,8 +105,8 @@ def get_dense_pano_ids(api_key: str, start_coord, end_coord,
 # =============================================================================
 # STEP 3: Real GPS metadata for a pano ID
 # =============================================================================
-def get_pano_metadata(api_key: str, session: str, pano_id: str):
-    """Returns (lat, lng, heading) or None."""
+def fetch_tile_metadata(api_key: str, session: str, pano_id: str):
+    """Returns the full tile-API metadata dict (incl. 'links') or None."""
     url = (
         f"https://tile.googleapis.com/v1/streetview/metadata"
         f"?session={session}&key={api_key}&panoId={pano_id}"
@@ -114,7 +117,73 @@ def get_pano_metadata(api_key: str, session: str, pano_id: str):
     meta = r.json()
     if "lat" not in meta or "lng" not in meta:
         return None
+    return meta
+
+
+def get_pano_metadata(api_key: str, session: str, pano_id: str):
+    """Returns (lat, lng, heading) or None."""
+    meta = fetch_tile_metadata(api_key, session, pano_id)
+    if meta is None:
+        return None
     return meta["lat"], meta["lng"], meta.get("heading", 0.0)
+
+
+def find_pano_id(lat: float, lng: float):
+    """Nearest pano ID to a lat/lng, or None."""
+    resp = requests.get(
+        "https://maps.googleapis.com/maps/api/streetview/metadata",
+        params={"location": f"{lat},{lng}", "key": API_KEY, "radius": 50}
+    )
+    data = resp.json()
+    if data.get("status") != "OK":
+        return None
+    return data["pano_id"]
+
+
+# =============================================================================
+# STEP 3b: Walk down the road from a seed pano via Street View links
+# =============================================================================
+def _angle_diff(a: float, b: float) -> float:
+    return abs((a - b + 180) % 360 - 180)
+
+
+def walk_road(api_key: str, session: str, seed_meta: dict, hops: int) -> list:
+    """
+    From a seed pano, follow Street View links `hops` drops in every direction
+    the road goes from the seed. At each step, take the link closest to the
+    current heading so we stay on the same street.
+
+    Returns the list of pano IDs found (not including the seed).
+    """
+    found = []
+    visited = {seed_meta["panoId"]}
+
+    for start_link in seed_meta.get("links", []):
+        heading = start_link["heading"]
+        next_id = start_link["panoId"]
+        print(f"  -> Walking heading {heading:.0f}°")
+
+        for _ in range(hops):
+            if next_id in visited:
+                break
+            visited.add(next_id)
+
+            meta = fetch_tile_metadata(api_key, session, next_id)
+            if meta is None:
+                break
+            found.append(next_id)
+
+            # Pick the link that continues straight ahead
+            candidates = [l for l in meta.get("links", [])
+                          if l["panoId"] not in visited
+                          and _angle_diff(l["heading"], heading) <= MAX_TURN_DEG]
+            if not candidates:
+                break
+            best = min(candidates, key=lambda l: _angle_diff(l["heading"], heading))
+            heading = best["heading"]
+            next_id = best["panoId"]
+
+    return found
 
 
 # =============================================================================
@@ -139,7 +208,11 @@ def download_and_stitch_panorama(api_key: str, session: str, pano_id: str,
         f"/{zoom}/0/0"
         f"?session={session}&key={api_key}&panoId={pano_id}"
     )
-    probe = requests.get(probe_url, timeout=10)
+    try:
+        probe = requests.get(probe_url, timeout=10)
+    except requests.exceptions.RequestException as e:
+        print(f"    [ERROR] Probe tile request failed ({e}), skipping pano")
+        return None
     if probe.status_code != 200:
         print(f"    [ERROR] Could not fetch probe tile (HTTP {probe.status_code})")
         return None
@@ -204,43 +277,32 @@ def main():
         all_metadata = []
 
     seen_panos = set(entry["pano_id"] for entry in all_metadata)
-    existing = list(Path(OUTPUT_FOLDER).glob("pano_*.jpg"))
-    index = len(existing)
+    # Start after the highest number used so far (on disk or in metadata), not
+    # the file count -- deleted images leave gaps, and counting them would
+    # reuse names and overwrite existing panos.
+    used = [int(p.stem.split("_")[1]) for p in Path(OUTPUT_FOLDER).glob("pano_*.jpg")]
+    used += [entry["pano_index"] for entry in all_metadata]
+    index = max(used, default=-1) + 1
 
     print(f"Resuming from index {index} with {len(seen_panos)} already seen panos")
 
-
-    for lat, lng, hood, high_density in COORDINATES:
-        print(f"\n[{index+1}/{len(COORDINATES)}] {hood} ({lat}, {lng})")
-
-        resp = requests.get(
-            "https://maps.googleapis.com/maps/api/streetview/metadata",
-            params={"location": f"{lat},{lng}", "key": API_KEY, "radius": 50}
-        )
-        data = resp.json()
-        print(f"  [DEBUG] API response: {data}")
-
-        if data.get("status") != "OK":
-            print(f"  [-] No pano found")
-            continue
-
-        pano_id = data["pano_id"]
-
+    def save_pano(pano_id, hood, high_density):
+        nonlocal index
         if pano_id in seen_panos:
             print(f"  [~] Duplicate pano, skipping")
-            continue
+            return
         seen_panos.add(pano_id)
 
         print(f"  [+] Pano: {pano_id[:12]}...")
 
         meta = get_pano_metadata(API_KEY, session, pano_id)
         if meta is None:
-            continue
+            return
         real_lat, real_lng, car_heading = meta
 
         fname = download_and_stitch_panorama(API_KEY, session, pano_id, OUTPUT_FOLDER, index)
         if fname is None:
-            continue
+            return
 
         all_metadata.append({
             "image_name": fname,
@@ -257,6 +319,31 @@ def main():
         with open(METADATA_FILE, "w") as f:
             json.dump(all_metadata, f, indent=2)
 
+    for i, (lat, lng, hood, high_density) in enumerate(COORDINATES, 1):
+        print(f"\n[{i}/{len(COORDINATES)}] {hood} ({lat}, {lng})")
+
+        pano_id = find_pano_id(lat, lng)
+        if pano_id is None:
+            print(f"  [-] No pano found")
+            continue
+        save_pano(pano_id, hood, high_density)
+
+    for i, (lat, lng, hood, high_density) in enumerate(SEED_POINTS, 1):
+        print(f"\n[Seed {i}/{len(SEED_POINTS)}] {hood} ({lat}, {lng})")
+
+        seed_id = find_pano_id(lat, lng)
+        if seed_id is None:
+            print(f"  [-] No pano found")
+            continue
+        seed_meta = fetch_tile_metadata(API_KEY, session, seed_id)
+        if seed_meta is None:
+            continue
+
+        road_ids = walk_road(API_KEY, session, seed_meta, HOPS_PER_DIRECTION)
+        print(f"  Found {len(road_ids)} drops down the road")
+
+        for pano_id in [seed_id] + road_ids:
+            save_pano(pano_id, hood, high_density)
 
 
 
